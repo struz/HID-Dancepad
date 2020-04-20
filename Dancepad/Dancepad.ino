@@ -1,19 +1,24 @@
 #include <Keyboard.h>
 #include "panel.h"
 
+#define NUMPAD_4 228
+#define NUMPAD_2 226
+#define NUMPAD_8 232
+#define NUMPAD_6 230
+
 //Panel::Panel(int pin, int pressPressure, int releaseDelta, char scanCode)
 Panel panels[4]
 {
-  Panel(A2, 300, 20, '4'),
-  Panel(A1, 370, 20, '2'),
-  Panel(A0, 180, 20, '8'),
-  Panel(A3, 330, 20, '6')
+  Panel(A0, 50, 5, NUMPAD_4, 'L'),
+  Panel(A1, 170, 20, NUMPAD_2, 'D'),
+  Panel(A2, 200, 20, NUMPAD_8, 'U'),
+  Panel(A3, 50, 5, NUMPAD_6, 'R')
 };
 
 // Debug level - 0 = off, 1 = tap/release info, 2 = raw sensor voltage
 byte debugLevel = 1;
 // Keyboard input enabled/disabled - disable for testing
-bool keyboardEnabled = false;
+bool keyboardEnabled = true;
 
 // Used for debugging
 bool held = false;
@@ -88,24 +93,24 @@ void loop(void)
     if ((mtime - panel.timeSincePress) > 20) {
       if (!panel.pressed && pressure < panel.pressPressure) {
         if (debugLevel >= 1) {
-          Serial.print("[");
+          Serial.print("===\n[");
           Serial.print(pressure, DEC);
           Serial.print("] ");
-          Serial.print(panel.scanCode);
-          Serial.println(" pressed");
+          Serial.print(panel.arrowName);
+          Serial.println(" pressed\n===");
         }
         panel.timeSincePress = mtime;
         panel.pressed = true;
         doKeyPress(panel.scanCode);
       } else if (panel.pressed && pressure > panel.releasePressure) {
         if (debugLevel >= 1) {
-          Serial.print("[");
+          Serial.print("===\n[");
           Serial.print(pressure, DEC);
           Serial.print("] ");
-          Serial.print(panel.scanCode);
+          Serial.print(panel.arrowName);
           Serial.print(" released, held: ");
           Serial.print(mtime - panel.timeSincePress, DEC);
-          Serial.print("\n");
+          Serial.print("\n===\n");
         }
         panel.timeSincePress = mtime;
         panel.pressed = false;
