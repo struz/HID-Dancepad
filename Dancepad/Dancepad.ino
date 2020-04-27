@@ -1,8 +1,3 @@
-// TODO: we might be able to detect rising voltage and assume pressure was lifted off?
-// this may fix the issue with if we stand on a pad for a long time then release, it's slower to release
-// I don't think I can fix the single use case of releasing a long hold without special code
-// because making the pads less sensitive exacerbates the issue, but making them more sensitive makes it harder to double tap?
-
 #include <Keyboard.h>
 #include "panel.h"
 
@@ -52,27 +47,26 @@ void handleInput() {
   if (Serial.available()){
     String input = Serial.readString();
     input.trim();
-    Serial.print("Command received: " );
-    Serial.println(input);
+//    Serial.print("Command received: " );
+//    Serial.println(input);
 
     // Command handling
-    // debug <level>
-    if (input.length() == 7 && input.startsWith("debug")) {
-      int tmpDebugLevel = input.charAt(6) - 48;
+    if (input.length() == 2 && input.charAt(0) == 'd') {
+      // Change debug level - input == "d<level>"
+      int tmpDebugLevel = input.charAt(1) - 48;
       switch (tmpDebugLevel) {
         case 0:
         case 1:
         case 2:
           debugLevel = tmpDebugLevel;
-          Serial.print("debug level set to ");
+          Serial.print("M:debug level set to ");
           Serial.println(debugLevel, DEC);
           break;
         default:
-          Serial.println("Invalid debug level supplied");
+          Serial.println("M:invalid debug level supplied");
       }
-      // TODO: keyboard on/off, remember to release all keys that are curerntly held when turning off!!
-    } else if (input.length() == 8 && input.equals("keyboard")) {
-      // Toggle keyboard
+    } else if (input.length() == 1 && input.charAt(0) == 'k') {
+      // Toggle keyboard - input == "k"
       keyboardEnabled = !keyboardEnabled;
       // If we're turning off the keyboard, unpress every key that is currently potentially pressed
       if (!keyboardEnabled) {
@@ -80,14 +74,39 @@ void handleInput() {
           Keyboard.release(panels[i].scanCode);
         }
       }
-      Serial.print("Keyboard input ");
+      Serial.print("M:keyboard input ");
       if (keyboardEnabled) {
-        Serial.print("enabled\n");
+        Serial.println("enabled");
       } else {
-        Serial.print("disabled\n");
+        Serial.println("disabled");
       }
+    } else if (input.length() == 2 && input.startsWith("sg")) {
+      // Sensor Get thresholds - input == "sg"
+      sendSensorThresholds();
+    } else if (input.length() > 2 && input.startsWith("su")) {
+      // Sensor Update thresholds - input == "su"
+      updateSensorThresholds();
     } else {
-      Serial.println("Unknown command");
+      Serial.println("M:unknown command");
+    }
+  }
+}
+
+void updateSensorThresholds() {
+  // TODO
+}
+
+void sendSensorThresholds() {
+  // Return message is ST for Sensor Thresholds, followed by
+  // the sensor press and release thresholds for each sensor
+  // i.e. "ST 50,60 50,40 50,50 60,70"
+  Serial.print("ST ");
+  for (int i = 0; i < NUM_PANELS; i++) {
+    Serial.print(panels[i].pressPressure, DEC);
+    Serial.print(",");
+    Serial.print(panels[i].releasePressure, DEC);
+    if (i < NUM_PANELS - 1) {
+      Serial.print(" ");
     }
   }
 }
@@ -105,24 +124,24 @@ void doKeyRelease(Panel panel) {
 }
 
 void printDebugPanelHold(Panel panel, int pressure) {
-  if (debugLevel >= 1) {
-    Serial.print("===\n[");
+  if (debugLevel == 1) {
+    Serial.print("M:===\nM:[");
     Serial.print(pressure, DEC);
     Serial.print("] ");
     Serial.print(panel.arrowName);
-    Serial.println(" pressed\n===");
+    Serial.println(" pressed\nM:===");
   }
 }
 
 void printDebugPanelRelease(Panel panel, int pressure, unsigned long mtime) {
-  if (debugLevel >= 1) {
-    Serial.print("===\n[");
+  if (debugLevel == 1) {
+    Serial.print("M:===\nM:[");
     Serial.print(pressure, DEC);
     Serial.print("] ");
     Serial.print(panel.arrowName);
     Serial.print(" released, held: ");
     Serial.print(mtime - panel.timeSincePress, DEC);
-    Serial.print("\n===\n");
+    Serial.print("\nM:===\n");
   }
 }
 
@@ -160,7 +179,7 @@ void setup(void)
   // Setup serial for debugging purposes
   Serial.begin(9600);
   while (! Serial); // Wait untilSerial is ready - Leonardo
-  Serial.println("Setup complete");
+  Serial.println("M:setup complete");
 }
 
 void loop(void)
@@ -193,15 +212,22 @@ void loop(void)
 //    }
   }
 
-  if (debugLevel >= 2) {
-    if ((millis() - lastReportedDebugMillis) > debugReportThresholdMillis) {
-      Serial.print("SD:"); // SD for Sensor Data
+  if (debugLevel == 2) {
+    unsigned long reportMillis = millis();
+    if ((reportMillis - lastReportedDebugMillis) > debugReportThresholdMillis) {
+      // Debug message format: "SD <report millis> <Lv> <Dv> <Uv> <Rv>
+      // where Lv is the Left sensor voltage, etc
+      Serial.print("SD "); // SD for Sensor Data message, as opposed to "M:" for info message
+      Serial.print(reportMillis);
+      Serial.print(" ");
       for (int i = 0; i < NUM_PANELS; i++) {
         Serial.print(LDURrawPanelVoltages[i]);
-        Serial.print(" ");
+        if (i < NUM_PANELS - 1) {
+          Serial.print(" ");
+        }
       }
       Serial.print("\n");
-      lastReportedDebugMillis = millis();
+      lastReportedDebugMillis = reportMillis;
     }
   }
   // Process commands received via serial console
