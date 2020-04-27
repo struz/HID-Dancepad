@@ -44,16 +44,29 @@ unsigned int debugReportThresholdMillis = 50;
 unsigned long lastReportedDebugMillis;
 
 void handleInput() {
+  // For serial console use - small buffer because we're not expecting
+  // any big commands. Can only support (SERIAL_BUF_LENGTH - 1) length comamnds
+  // so that we have print-safe strings.
+  #define SERIAL_BUF_LENGTH 32
+  char serialBuf[SERIAL_BUF_LENGTH];
+  
   if (Serial.available()){
-    String input = Serial.readString();
-    input.trim();
+    size_t bytesRead = Serial.readBytesUntil('\n', serialBuf, SERIAL_BUF_LENGTH);
+    if (bytesRead >= SERIAL_BUF_LENGTH) {
+      Serial.print("E:incoming command exceeded buffer size");
+      return;
+    }
+
+    // null terminate for print safety
+    serialBuf[bytesRead] = '\0';
+    
 //    Serial.print("Command received: " );
-//    Serial.println(input);
+//    Serial.println(serialBuf);
 
     // Command handling
-    if (input.length() == 2 && input.charAt(0) == 'd') {
+    if (bytesRead == 2 && serialBuf[0] == 'd') {
       // Change debug level - input == "d<level>"
-      int tmpDebugLevel = input.charAt(1) - 48;
+      int tmpDebugLevel = serialBuf[1] - 48;
       switch (tmpDebugLevel) {
         case 0:
         case 1:
@@ -65,7 +78,7 @@ void handleInput() {
         default:
           Serial.println("M:invalid debug level supplied");
       }
-    } else if (input.length() == 1 && input.charAt(0) == 'k') {
+    } else if (bytesRead == 1 && serialBuf[0] == 'k') {
       // Toggle keyboard - input == "k"
       keyboardEnabled = !keyboardEnabled;
       // If we're turning off the keyboard, unpress every key that is currently potentially pressed
@@ -80,10 +93,10 @@ void handleInput() {
       } else {
         Serial.println("disabled");
       }
-    } else if (input.length() == 2 && input.startsWith("sg")) {
+    } else if (bytesRead == 2 && serialBuf[0] == 's' && serialBuf[1] == 'g') {
       // Sensor Get thresholds - input == "sg"
       sendSensorThresholds();
-    } else if (input.length() > 2 && input.startsWith("su")) {
+    } else if (bytesRead > 2 && serialBuf[0] == 's' && serialBuf[1] == 'u') {
       // Sensor Update thresholds - input == "su"
       updateSensorThresholds();
     } else {
@@ -109,6 +122,7 @@ void sendSensorThresholds() {
       Serial.print(" ");
     }
   }
+  Serial.print("\n");
 }
 
 void doKeyPress(Panel panel) {
