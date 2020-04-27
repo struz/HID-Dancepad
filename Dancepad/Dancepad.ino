@@ -17,13 +17,21 @@
 #define LED_PIN_NUM 13
 
 //Panel::Panel(int pin, int pressPressure, int releaseDelta, char scanCode)
-// Lower pressure values = higher sensitivity
+// Lower pressure values = lower sensitivity, but faster hold release
+//Panel panels[4]
+//{
+//  Panel(A0, 95, 20, NUMPAD_4, 'L'),
+//  Panel(A1, 75, 20, NUMPAD_2, 'D'),
+//  Panel(A2, 120, 0, NUMPAD_8, 'U'),
+//  Panel(A3, 102, 0, NUMPAD_6, 'R')
+//};
+
 Panel panels[4]
 {
-  Panel(A0, 55, 15, NUMPAD_4, 'L'),
-  Panel(A1, 95, 15, NUMPAD_2, 'D'),
-  Panel(A2, 95, 15, NUMPAD_8, 'U'),
-  Panel(A3, 55, 15, NUMPAD_6, 'R')
+  Panel(A0, 125, 0, NUMPAD_4, 'L'),
+  Panel(A1, 75, 20, NUMPAD_2, 'D'),
+  Panel(A2, 120, 0, NUMPAD_8, 'U'),
+  Panel(A3, 100, 0, NUMPAD_6, 'R')
 };
 
 // Debug level - 0 = off, 1 = tap/release info, 2 = raw sensor voltage
@@ -144,6 +152,11 @@ void setup(void)
   Keyboard.begin();
   // Initialize the LED digital pin as output
   pinMode(LED_PIN_NUM, OUTPUT);
+  // Use a pull up resistor for our analog pins
+  pinMode(A0, INPUT_PULLUP);
+  pinMode(A1, INPUT_PULLUP);
+  pinMode(A0, INPUT_PULLUP);
+  pinMode(A0, INPUT_PULLUP);
   // Setup serial for debugging purposes
   Serial.begin(9600);
   while (! Serial); // Wait untilSerial is ready - Leonardo
@@ -161,7 +174,7 @@ void loop(void)
     LDURrawPanelVoltages[i] = pressure;
 
     // timeSincePress is simple debouncing
-    if ((mtime - panel.timeSincePress) > DEBOUNCE_THRESHOLD) {
+//    if ((mtime - panel.timeSincePress) > DEBOUNCE_THRESHOLD) {
       if (!panel.pressed && pressure < panel.pressPressure) {
         printDebugPanelHold(panel, pressure);
         panel.timeSincePress = mtime;
@@ -177,11 +190,12 @@ void loop(void)
         // If no more panels are pressed, turn off the LED
         checkTurnOffLED();
       }
-    }
+//    }
   }
 
   if (debugLevel >= 2) {
     if ((millis() - lastReportedDebugMillis) > debugReportThresholdMillis) {
+      Serial.print("SD:"); // SD for Sensor Data
       for (int i = 0; i < NUM_PANELS; i++) {
         Serial.print(LDURrawPanelVoltages[i]);
         Serial.print(" ");
