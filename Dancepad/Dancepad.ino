@@ -45,14 +45,16 @@ unsigned long lastReportedDebugMillis;
 
 void handleInput() {
   // For serial console use - small buffer because we're not expecting
-  // any big commands. Can only support (SERIAL_BUF_LENGTH - 1) length comamnds
-  // so that we have print-safe strings.
-  #define SERIAL_BUF_LENGTH 32
+  // any big commands.
+  #define SERIAL_BUF_LENGTH 64
   char serialBuf[SERIAL_BUF_LENGTH];
   
   if (Serial.available()){
     size_t bytesRead = Serial.readBytesUntil('\n', serialBuf, SERIAL_BUF_LENGTH);
     if (bytesRead >= SERIAL_BUF_LENGTH) {
+      // If bytesRead is equal to the length then if we null terminate below, we 
+      // will clobber a meaningful character. Thus the command exceeds size at
+      // SERIAL_BUF_LENGTH rather than > SERIAL_BUF_LENGTH.
       Serial.print("E:incoming command exceeded buffer size");
       return;
     }
@@ -97,16 +99,77 @@ void handleInput() {
       // Sensor Get thresholds - input == "sg"
       sendSensorThresholds();
     } else if (bytesRead > 2 && serialBuf[0] == 's' && serialBuf[1] == 'u') {
-      // Sensor Update thresholds - input == "su"
-      updateSensorThresholds();
+      // Sensor Update thresholds - input ==
+      // "su <Lval>,<Lval> <Dval>,<Dval>, <Uval>,<Uval>, <Rval>,<Rval>"
+      updateSensorThresholds(serialBuf + 3, bytesRead - 3);
     } else {
       Serial.println("M:unknown command");
     }
   }
 }
 
-void updateSensorThresholds() {
-  // TODO
+// NOTE: this function will briefly modify the sensorInput string - make sure
+// it's not in read-only memory, i.e. do not pass this a constant string.
+void updateSensorThresholds(char* sensorInput, size_t len) {
+  // Parse the sensor data given an input string and its length
+  size_t i = 0, sensorIndex = 0, thresholdIndex = 0;
+  int pressures[NUM_PANELS][2];
+  memset(pressures, 0, sizeof(pressures));
+  
+  while (i < len) {
+    // Safeguards to avoid overflows
+    if (sensorIndex >= NUM_PANELS || thresholdIndex > 1) {
+      break;
+    }
+
+    switch (sensorInput[i]) {
+      case ' ': // Sensor SEP char - moving on to next sensor
+        sensorIndex++;
+        thresholdIndex = 0;
+        break;
+      case ',': // Threshold SEP char - moving on to next threshold
+        thresholdIndex++;
+        break;
+      default: // Assume we're dealing with a numeric character, no error checking for simplicity
+        // Look ahead to find the next separator so we can convert a number
+        char nextSep = (thresholdIndex == 0) ? ',' : ' ';
+        char numLength = 0;
+        for (int j = i; j < len; j++) {
+          if (sensorInput[j] == nextSep) {
+            // Found the length of our number. Can also find it
+            // by running out of iteration numbers in the for loop.
+            break;
+          }
+          numLength++;
+        }
+        // Do some hacky stuff to use atoi on our non null terminated string
+        char originalChar = sensorInput[i + numLength];
+        sensorInput[i + numLength] = '\0';
+        pressures[sensorIndex][thresholdIndex] = atoi(sensorInput + i);
+        sensorInput[i + numLength] = originalChar;
+        
+        // Move ahead to the separator to process it next
+        i += numLength;
+        continue;
+    }
+    i++;
+  }
+  
+  // Return a message to echo the changes as we make them
+  Serial.print("SU ");
+  for (int i = 0; i < NUM_PANELS; i++) {
+    panels[i].pressPressure = pressures[i][0];
+    panels[i].releasePressure = pressures[i][1];
+    Serial.print("[");
+    Serial.print(pressures[i][0], DEC);
+    Serial.print(",");
+    Serial.print(pressures[i][1], DEC);
+    Serial.print("]");
+    if (i < NUM_PANELS - 1) {
+      Serial.print(" ");
+    }
+  }
+  Serial.print("\n");
 }
 
 void sendSensorThresholds() {
