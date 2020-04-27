@@ -1,8 +1,3 @@
-// TODO: we might be able to detect rising voltage and assume pressure was lifted off?
-// this may fix the issue with if we stand on a pad for a long time then release, it's slower to release
-// I don't think I can fix the single use case of releasing a long hold without special code
-// because making the pads less sensitive exacerbates the issue, but making them more sensitive makes it harder to double tap?
-
 #include <Keyboard.h>
 #include "panel.h"
 
@@ -15,6 +10,25 @@
 #define DEBOUNCE_THRESHOLD 32
 
 #define LED_PIN_NUM 13
+
+// ===== Serial Protocol =====
+// The serial protocol used to communicate with a host here is fairly basic.
+// I've moved away from ASCII just so we can transmit more data without
+// worrying about baud rate, even though that's unlikely to become an issue.
+
+// There is a command separation byte 0xFF (nbsp if rendered in ascii) which
+// separates all commands to and from the device over serial.
+
+// Command message formats are command specific and are documented in comments.
+// They all begin with the byte 0xFE followed by an ascii code unique to the 
+// command.
+// ===========================
+
+// TODO: the above won't work, we need control characters to say that the next input is an int and how long it is
+// etc. Otherwise a specifically crafted int would look like a command in itself.
+
+#define SERIAL_PROTOCOL_CMD_START_BYTE = 0xFE
+#define SERIAL_PROTOCOL_CMD_END_BYTE = 0xFF
 
 //Panel::Panel(int pin, int pressPressure, int releaseDelta, char scanCode)
 // Lower pressure values = lower sensitivity, but faster hold release
@@ -47,6 +61,16 @@ unsigned int pressureThreshold = 260;
 // Report debugLevel=2 results every X milliseconds
 unsigned int debugReportThresholdMillis = 50;
 unsigned long lastReportedDebugMillis;
+
+// Sends the bytes 
+void sendSerialCommand(char cmdCode, cmdContentBytes byte[]) {
+  // 1 char for command header, 1 char for footer
+  unsigned int cmdLength = 2 + sizeof(cmdContentBytes);
+  char cmdBytes = malloc(cmdLength);
+  cmdBytes[0] = 
+  Serial.write(cmdBytes);
+  free(cmdBytes);
+}
 
 void handleInput() {
   if (Serial.available()){
