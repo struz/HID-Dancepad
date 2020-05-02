@@ -55,7 +55,7 @@ void handleInput() {
       // If bytesRead is equal to the length then if we null terminate below, we 
       // will clobber a meaningful character. Thus the command exceeds size at
       // SERIAL_BUF_LENGTH rather than > SERIAL_BUF_LENGTH.
-      Serial.print("E:incoming command exceeded buffer size");
+      Serial.print("E: incoming command exceeded buffer size");
       return;
     }
 
@@ -74,11 +74,11 @@ void handleInput() {
         case 1:
         case 2:
           debugLevel = tmpDebugLevel;
-          Serial.print("M:debug level set to ");
+          Serial.print("M: debug level set to ");
           Serial.println(debugLevel, DEC);
           break;
         default:
-          Serial.println("M:invalid debug level supplied");
+          Serial.println("M: invalid debug level supplied");
       }
     } else if (bytesRead == 1 && serialBuf[0] == 'k') {
       // Toggle keyboard - input == "k"
@@ -89,7 +89,7 @@ void handleInput() {
           Keyboard.release(panels[i].scanCode);
         }
       }
-      Serial.print("M:keyboard input ");
+      Serial.print("M: keyboard input ");
       if (keyboardEnabled) {
         Serial.println("enabled");
       } else {
@@ -103,7 +103,7 @@ void handleInput() {
       // "su <Lval>,<Lval> <Dval>,<Dval>, <Uval>,<Uval>, <Rval>,<Rval>"
       updateSensorThresholds(serialBuf + 3, bytesRead - 3);
     } else {
-      Serial.println("M:unknown command");
+      Serial.println("M: unknown command");
     }
   }
 }
@@ -160,11 +160,9 @@ void updateSensorThresholds(char* sensorInput, size_t len) {
   for (int i = 0; i < NUM_PANELS; i++) {
     panels[i].pressPressure = pressures[i][0];
     panels[i].releasePressure = pressures[i][1];
-    Serial.print("[");
     Serial.print(pressures[i][0], DEC);
     Serial.print(",");
     Serial.print(pressures[i][1], DEC);
-    Serial.print("]");
     if (i < NUM_PANELS - 1) {
       Serial.print(" ");
     }
@@ -202,23 +200,23 @@ void doKeyRelease(Panel panel) {
 
 void printDebugPanelHold(Panel panel, int pressure) {
   if (debugLevel == 1) {
-    Serial.print("M:===\nM:[");
+    Serial.print("M: ===\nM: [");
     Serial.print(pressure, DEC);
     Serial.print("] ");
     Serial.print(panel.arrowName);
-    Serial.println(" pressed\nM:===");
+    Serial.println(" pressed\nM: ===");
   }
 }
 
 void printDebugPanelRelease(Panel panel, int pressure, unsigned long mtime) {
   if (debugLevel == 1) {
-    Serial.print("M:===\nM:[");
+    Serial.print("M: ===\nM: [");
     Serial.print(pressure, DEC);
     Serial.print("] ");
     Serial.print(panel.arrowName);
     Serial.print(" released, held: ");
     Serial.print(mtime - panel.timeSincePress, DEC);
-    Serial.print("\nM:===\n");
+    Serial.print("\nM: ===\n");
   }
 }
 
@@ -256,7 +254,7 @@ void setup(void)
   // Setup serial for debugging purposes
   Serial.begin(9600);
   while (! Serial); // Wait untilSerial is ready - Leonardo
-  Serial.println("M:setup complete");
+  Serial.println("M: setup complete");
 }
 
 void loop(void)
@@ -294,7 +292,7 @@ void loop(void)
     if ((reportMillis - lastReportedDebugMillis) > debugReportThresholdMillis) {
       // Debug message format: "SD <report millis> <Lv> <Dv> <Uv> <Rv>
       // where Lv is the Left sensor voltage, etc
-      Serial.print("SD "); // SD for Sensor Data message, as opposed to "M:" for info message
+      Serial.print("SD "); // SD for Sensor Data message, as opposed to "M: " for info message
       Serial.print(reportMillis);
       Serial.print(" ");
       for (int i = 0; i < NUM_PANELS; i++) {
