@@ -261,6 +261,8 @@ void loop(void)
 {
   // In order of LDUR, like the game
   int LDURrawPanelVoltages[4];
+  // Used to emit a debug message on state change when debug level is appropriate
+  bool anyPanelPressedStateChanged = false;
   for (int i = 0; i < NUM_PANELS; i++) {
     Panel &panel = panels[i];
     unsigned long mtime = millis();
@@ -275,6 +277,7 @@ void loop(void)
         panel.pressed = true;
         doKeyPress(panel);
         turnOnLED();
+        anyPanelPressedStateChanged = true;
       } else if (panel.pressed && pressure > panel.releasePressure) {
         printDebugPanelRelease(panel, pressure, mtime);
         panel.timeSincePress = mtime;
@@ -283,20 +286,30 @@ void loop(void)
 
         // If no more panels are pressed, turn off the LED
         checkTurnOffLED();
+        anyPanelPressedStateChanged = true;
       }
 //    }
   }
 
   if (debugLevel == 2) {
     unsigned long reportMillis = millis();
-    if ((reportMillis - lastReportedDebugMillis) > debugReportThresholdMillis) {
-      // Debug message format: "SD <report millis> <Lv> <Dv> <Uv> <Rv>
-      // where Lv is the Left sensor voltage, etc
+    // If we reached the threshold for another update, or if we had a sensor state change
+    if ((reportMillis - lastReportedDebugMillis) > debugReportThresholdMillis || anyPanelPressedStateChanged) {
+      // Debug message format: "SD <report millis> <Lv>,<Ps> <Dv>,<Ps> <Uv>,<Ps> <Rv>,<Ps>
+      // where Lv is the Left sensor voltage (etc) and <Ps> is the pressed state of the panel as T=true, F=false
       Serial.print("SD "); // SD for Sensor Data message, as opposed to "M: " for info message
       Serial.print(reportMillis);
       Serial.print(" ");
       for (int i = 0; i < NUM_PANELS; i++) {
         Serial.print(LDURrawPanelVoltages[i]);
+        Serial.print(",");
+        
+        if (panels[i].pressed) {
+          Serial.print("T");
+        } else {
+          Serial.print("F");
+        }
+        
         if (i < NUM_PANELS - 1) {
           Serial.print(" ");
         }
