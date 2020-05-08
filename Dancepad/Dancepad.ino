@@ -25,8 +25,8 @@ Panel panels[4]
 {
   Panel(A0, 125, 0, NUMPAD_4, 'L'),
   Panel(A1, 75, 20, NUMPAD_2, 'D'),
-  Panel(A2, 120, 0, NUMPAD_8, 'U'),
-  Panel(A3, 100, 0, NUMPAD_6, 'R')
+  Panel(A3, 120, 0, NUMPAD_8, 'U'),
+  Panel(A4, 100, 0, NUMPAD_6, 'R')
 };
 
 // Debug level - 0 = off, 1 = tap/release info, 2 = raw sensor voltage
@@ -246,11 +246,12 @@ void setup(void)
   Keyboard.begin();
   // Initialize the LED digital pin as output
   pinMode(LED_PIN_NUM, OUTPUT);
-  // Use a pull up resistor for our analog pins
-  pinMode(A0, INPUT_PULLUP);
-  pinMode(A1, INPUT_PULLUP);
-  pinMode(A0, INPUT_PULLUP);
-  pinMode(A0, INPUT_PULLUP);
+  // Initialise our input pins
+  // Note: INPUT_PULLUP makes the pins less sensitive, which means less fluctuation but slightly slower response times
+  pinMode(A0, INPUT);
+  pinMode(A1, INPUT);
+  pinMode(A3, INPUT);
+  pinMode(A4, INPUT);
   // Setup serial for debugging purposes
   Serial.begin(9600);
   while (! Serial); // Wait untilSerial is ready - Leonardo
