@@ -23,10 +23,10 @@
 
 Panel panels[4]
 {
-  Panel(A0, 125, 0, NUMPAD_4, 'L'),
-  Panel(A1, 75, 20, NUMPAD_2, 'D'),
-  Panel(A3, 120, 0, NUMPAD_8, 'U'),
-  Panel(A4, 100, 0, NUMPAD_6, 'R')
+  Panel(A0, 750, 0, NUMPAD_4, 'L'),
+  Panel(A1, 550, 0, NUMPAD_2, 'D'),
+  Panel(A3, 900, 0, NUMPAD_8, 'U'),
+  Panel(A4, 750, 0, NUMPAD_6, 'R')
 };
 
 // Debug level - 0 = off, 1 = tap/release info, 2 = raw sensor voltage
@@ -246,12 +246,14 @@ void setup(void)
   Keyboard.begin();
   // Initialize the LED digital pin as output
   pinMode(LED_PIN_NUM, OUTPUT);
-  // Initialise our input pins
-  // Note: INPUT_PULLUP makes the pins less sensitive, which means less fluctuation but slightly slower response times
-  pinMode(A0, INPUT);
-  pinMode(A1, INPUT);
-  pinMode(A3, INPUT);
-  pinMode(A4, INPUT);
+  // Initialise our input pins. Use pullup resistors so that they generate current that
+  // we can pull down to ground via applying pressure to the sensor. This provides a much
+  // more independent and easily wired circuit than if we use 5v and split it off into our sensors
+  // (at least in my experience).
+  for (int i = 0; i < NUM_PANELS; i++) {
+    pinMode(panels[i].pin, OUTPUT);
+    digitalWrite(panels[i].pin, HIGH);
+  }
   // Setup serial for debugging purposes
   Serial.begin(9600);
   while (! Serial); // Wait untilSerial is ready - Leonardo
