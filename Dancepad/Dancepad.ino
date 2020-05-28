@@ -293,7 +293,7 @@ void loop(void)
         doKeyPress(panel);
         turnOnLED();
         anyPanelPressedStateChanged = true;
-      } else if (panel.pressed && !sensorIsPressed(pressure, panel.pressPressure)) {
+      } else if (panel.pressed && !sensorIsPressed(pressure, panel.releasePressure)) {
         printDebugPanelRelease(panel, pressure, mtime);
         panel.timeSincePress = mtime;
         panel.pressed = false;
