@@ -11,16 +11,16 @@
 
 #define LED_PIN_NUM 13
 
-//Panel::Panel(int pin, int pressPressure, int releaseDelta, char scanCode)
-// Lower pressure values = lower sensitivity, but faster hold release
-//Panel panels[4]
-//{
-//  Panel(A0, 95, 20, NUMPAD_4, 'L'),
-//  Panel(A1, 75, 20, NUMPAD_2, 'D'),
-//  Panel(A2, 120, 0, NUMPAD_8, 'U'),
-//  Panel(A3, 102, 0, NUMPAD_6, 'R')
-//};
+#define PRESS_LOW 0x0
+#define PRESS_HIGH 0x1
 
+// === CONFIGURATION SETTINGS - CHANGE THESE ===
+
+// Panel::Panel(int pin, int pressPressure, int releaseDelta, char scanCode, char arrowName)
+// EDITME: edit the pins here to match what is plugged into your microcontroller.
+// Optionally edit the 4th argument to supply a different keycode to press when pressing that
+// panel down.
+// Optionally edit the 2nd argument to change the default sensitivity for each panel.
 Panel panels[4]
 {
   Panel(A0, 750, 0, NUMPAD_4, 'L'),
@@ -29,19 +29,21 @@ Panel panels[4]
   Panel(A4, 750, 0, NUMPAD_6, 'R')
 };
 
-// Debug level - 0 = off, 1 = tap/release info, 2 = raw sensor voltage
-byte debugLevel = 2;
-// Keyboard input enabled/disabled - disable for testing
-bool keyboardEnabled = true;
+// EDITME:
+// - use PRESS_LOW if pressing down a panel supplies voltage to your pin.
+// - use PRESS_HIGH if pressing down a panel connects your pin to ground.
+byte gCircuitMode = PRESS_LOW;
 
-// Used for debugging
-bool held = false;
-unsigned long millisActivated = 0;
-unsigned long releasedMillis = 0;
-unsigned int pressureThreshold = 260;
-// Report debugLevel=2 results every X milliseconds
-unsigned int debugReportThresholdMillis = 50;
-unsigned long lastReportedDebugMillis;
+// ================ END CHANGES ================
+
+// Debug level - 0 = off, 1 = tap/release info, 2 = raw sensor voltage
+byte gDebugLevel = 2;
+// Keyboard input enabled/disabled - disable for testing
+bool gKeyboardEnabled = true;
+
+// Report gDebugLevel=2 results every X milliseconds
+unsigned int gDebugReportThresholdMillis = 50;
+unsigned long gLastReportedDebugMillis;
 
 void handleInput() {
   // For serial console use - small buffer because we're not expecting
@@ -49,7 +51,7 @@ void handleInput() {
   #define SERIAL_BUF_LENGTH 64
   char serialBuf[SERIAL_BUF_LENGTH];
   
-  if (Serial.available()){
+  if (Serial.available()) {
     size_t bytesRead = Serial.readBytesUntil('\n', serialBuf, SERIAL_BUF_LENGTH);
     if (bytesRead >= SERIAL_BUF_LENGTH) {
       // If bytesRead is equal to the length then if we null terminate below, we 
@@ -73,24 +75,24 @@ void handleInput() {
         case 0:
         case 1:
         case 2:
-          debugLevel = tmpDebugLevel;
+          gDebugLevel = tmpDebugLevel;
           Serial.print("M: debug level set to ");
-          Serial.println(debugLevel, DEC);
+          Serial.println(gDebugLevel, DEC);
           break;
         default:
           Serial.println("M: invalid debug level supplied");
       }
     } else if (bytesRead == 1 && serialBuf[0] == 'k') {
       // Toggle keyboard - input == "k"
-      keyboardEnabled = !keyboardEnabled;
+      gKeyboardEnabled = !gKeyboardEnabled;
       // If we're turning off the keyboard, unpress every key that is currently potentially pressed
-      if (!keyboardEnabled) {
+      if (!gKeyboardEnabled) {
         for (int i = 0; i < NUM_PANELS; i++) {
           Keyboard.release(panels[i].scanCode);
         }
       }
       Serial.print("M: keyboard input ");
-      if (keyboardEnabled) {
+      if (gKeyboardEnabled) {
         Serial.println("enabled");
       } else {
         Serial.println("disabled");
@@ -187,19 +189,19 @@ void sendSensorThresholds() {
 }
 
 void doKeyPress(Panel panel) {
-  if (keyboardEnabled) {
+  if (gKeyboardEnabled) {
     Keyboard.press(panel.scanCode);
   }
 }
 
 void doKeyRelease(Panel panel) {
-  if (keyboardEnabled) {
+  if (gKeyboardEnabled) {
     Keyboard.release(panel.scanCode);
   }
 }
 
 void printDebugPanelHold(Panel panel, int pressure) {
-  if (debugLevel == 1) {
+  if (gDebugLevel == 1) {
     Serial.print("M: ===\nM: [");
     Serial.print(pressure, DEC);
     Serial.print("] ");
@@ -209,7 +211,7 @@ void printDebugPanelHold(Panel panel, int pressure) {
 }
 
 void printDebugPanelRelease(Panel panel, int pressure, unsigned long mtime) {
-  if (debugLevel == 1) {
+  if (gDebugLevel == 1) {
     Serial.print("M: ===\nM: [");
     Serial.print(pressure, DEC);
     Serial.print("] ");
@@ -239,6 +241,12 @@ void checkTurnOffLED() {
   }
 }
 
+// sensorIsPressed returns true if a sensor is currently pressed, taking into account
+// gCircuitMode to work out whether it is pressed when voltage is supplied or removed.
+bool sensorIsPressed(int sensorValue, int sensorThreshold) {
+  return gCircuitMode == PRESS_LOW ? sensorValue <= sensorThreshold : sensorValue >= sensorThreshold;
+}
+
 void setup(void)
 {
   // Setup code, runs once
@@ -246,13 +254,17 @@ void setup(void)
   Keyboard.begin();
   // Initialize the LED digital pin as output
   pinMode(LED_PIN_NUM, OUTPUT);
-  // Initialise our input pins. Use pullup resistors so that they generate current that
-  // we can pull down to ground via applying pressure to the sensor. This provides a much
-  // more independent and easily wired circuit than if we use 5v and split it off into our sensors
-  // (at least in my experience).
+  // Initialise our input pins based on the circuit mode.
   for (int i = 0; i < NUM_PANELS; i++) {
-    pinMode(panels[i].pin, OUTPUT);
-    digitalWrite(panels[i].pin, HIGH);
+    if (gCircuitMode == PRESS_LOW) {
+      // The pin outputs current, which is dragged down to ground by stepping on the sensor. The more pressure, the
+      // lower the voltage.
+      pinMode(panels[i].pin, OUTPUT);
+      digitalWrite(panels[i].pin, HIGH);
+    } else {
+      // Voltage is supplied to the pin by stepping on the sensor.
+      pinMode(panels[i].pin, INPUT);
+    }
   }
   // Setup serial for debugging purposes
   Serial.begin(9600);
@@ -274,14 +286,14 @@ void loop(void)
 
     // timeSincePress is simple debouncing
 //    if ((mtime - panel.timeSincePress) > DEBOUNCE_THRESHOLD) {
-      if (!panel.pressed && pressure < panel.pressPressure) {
+      if (!panel.pressed && sensorIsPressed(pressure, panel.pressPressure)) {
         printDebugPanelHold(panel, pressure);
         panel.timeSincePress = mtime;
         panel.pressed = true;
         doKeyPress(panel);
         turnOnLED();
         anyPanelPressedStateChanged = true;
-      } else if (panel.pressed && pressure > panel.releasePressure) {
+      } else if (panel.pressed && !sensorIsPressed(pressure, panel.pressPressure)) {
         printDebugPanelRelease(panel, pressure, mtime);
         panel.timeSincePress = mtime;
         panel.pressed = false;
@@ -294,10 +306,10 @@ void loop(void)
 //    }
   }
 
-  if (debugLevel == 2) {
+  if (gDebugLevel == 2) {
     unsigned long reportMillis = millis();
     // If we reached the threshold for another update, or if we had a sensor state change
-    if ((reportMillis - lastReportedDebugMillis) > debugReportThresholdMillis || anyPanelPressedStateChanged) {
+    if ((reportMillis - gLastReportedDebugMillis) > gDebugReportThresholdMillis || anyPanelPressedStateChanged) {
       // Debug message format: "SD <report millis> <Lv>,<Ps> <Dv>,<Ps> <Uv>,<Ps> <Rv>,<Ps>
       // where Lv is the Left sensor voltage (etc) and <Ps> is the pressed state of the panel as T=true, F=false
       Serial.print("SD "); // SD for Sensor Data message, as opposed to "M: " for info message
@@ -318,7 +330,7 @@ void loop(void)
         }
       }
       Serial.print("\n");
-      lastReportedDebugMillis = reportMillis;
+      gLastReportedDebugMillis = reportMillis;
     }
   }
   // Process commands received via serial console
